@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# 2021 Mesar Hameed (mesar.hameed at gmail.com)
+#
+# This file is part of cdist.
+#
+# cdist is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cdist is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with cdist. If not, see <http://www.gnu.org/licenses/>.
+#
+#
+### BEGIN INIT INFO
+# Provides:          ipset
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# X-Start-Before:    iptables
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Create ipset lists before iptables rules require them
+# Description:       Applies lists found in /etc/ipset.d/*.saved
+#                    and saves/restores previous status
+### END INIT INFO
+
+case $1 in
+    start)
+        # Restore previous state:
+        /usr/local/bin/ipsets-restore
+    ;;
+    stop)
+        # Save current state before exiting:
+        /usr/local/bin/ipsets-save
+    ;;
+    restart)
+        "$0" stop &&  "$0" start
+    ;;
+    reset)
+        ipset flush
+    ;;
+esac

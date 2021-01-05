@@ -1,0 +1,79 @@
+#!/bin/bash -e
+#
+# 2021 Mesar Hameed (mesar.hameed at gmail.com)
+#
+# This file is part of cdist.
+#
+# cdist is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# cdist is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with cdist. If not, see <http://www.gnu.org/licenses/>.
+#
+
+e="$__object/explorer"
+p="$__object/parameter"
+name="$__object_id"
+type_is="$(cat "$e/type")"
+type_should="$(cat "$p/type")"
+state_is="$(cat "$e/state")"
+state_should="$(cat "$p/state")"
+needToSave=0
+
+case $state_should in
+    present)
+        if [ "$state_is" = "absent" ]; then
+            echo ipset create "$name" "$type_should"
+            needToSave=1
+        elif [ "$state_is" = "present" ] && [ "$type_is" != "$type_should" ]; then
+            echo ipset destroy "$name"
+            echo "rm \"/etc/ipset.d/${name}.saved\" || true"
+            echo ipset create "$name" "$type_should"
+            needToSave=1
+        fi
+    ;;
+    absent)
+        if [ "$state_is" = "present" ]; then
+            echo ipset destroy "$name"
+            echo "rm \"/etc/ipset.d/${name}.saved\" || true"
+        fi
+    ;;
+    *)
+        echo "Unknown state: $state_should" >&2
+        exit 1
+    ;;
+esac
+
+if [ "$state_should" = "present" ]; then
+    if [ -f "$p/add" ]; then
+        while read -r value; do
+            if ! grep -q "$value" "$e/content"; then
+                echo "ipset add $name $value"
+                needToSave=1
+            fi
+        done < "$p/add"
+    fi
+
+    if [ -f "$p/del" ]; then
+        while read -r value; do
+            if grep -q "$value" "$e/content"; then
+                echo "ipset del $name $value"
+                needToSave=1
+            fi
+        done < "$p/del"
+    fi
+elif [ "$state_should" = "absent" ] && \( [ -f "$p/add" ] || [ -f "$p/del" ] \); then
+    echo "Error: ipset state absent is incompatible with --add or --del" >&2
+    exit 1
+fi
+
+if [ $needToSave -ne 0 ]; then
+    echo /usr/local/bin/ipsets-save "$name"
+fi
